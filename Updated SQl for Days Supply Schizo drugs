@@ -1,0 +1,51 @@
+WITH IngredientDrugs AS (
+    -- Identify drugs with specified ingredients
+    WITH IngredientConcepts AS (
+        SELECT concept_id, concept_name
+        FROM concept
+        WHERE concept_name IN (
+            'amisulpride', 'amitriptyline', 'aripiprazole', 'aripiprazole lauroxil', 'asenapine', 
+            'asenapine maleate', 'brexpiprazole', 'bromperidol', 'bupropion', 'butaperazine', 
+            'cariprazine', 'chlorpromazine', 'chlorprothixene', 'clozapine', 'droperidol', 
+            'duloxetine', 'escitalopram', 'fluanisone', 'fluoxetine', 'fluphenazine', 
+            'haloperidol', 'iloperidone', 'loxapine', 'lumateperone', 'lurasidone', 
+            'mesoridazine', 'mirtazapine', 'molindone', 'nortriptyline', 'olanzapine', 
+            'paliperidone', 'paroxetine', 'perazine', 'periciazine', 'perphenazine', 
+            'pimavanserin', 'pimozide', 'pipamperone', 'pipothiazine', 'prochlorperazine', 
+            'promazine', 'quetiapine', 'risperidone', 'sertraline', 'sulpiride', 
+            'thioridazine', 'thiothixene', 'trifluoperazine', 'trifluperidol', 
+            'triflupromazine', 'valbenazine', 'venlafaxine', 'ziprasidone', 'zuclopenthixol'
+        )
+        AND domain_id = 'Drug'
+        AND standard_concept = 'S'
+    )
+    SELECT DISTINCT dc.concept_id AS drug_concept_id
+    FROM drug_strength ds
+    JOIN IngredientConcepts ic ON ds.ingredient_concept_id = ic.concept_id
+    JOIN concept dc ON ds.drug_concept_id = dc.concept_id
+    WHERE dc.domain_id = 'Drug'
+        AND dc.standard_concept = 'S'
+        AND ds.valid_end_date >= '2025-04-01'
+        AND ds.valid_start_date <= '2025-04-01'
+)
+SELECT 
+    de.drug_exposure_id,
+    de.person_id,
+    de.drug_concept_id,
+    de.days_supply,
+    de.quantity,
+    de.dose_unit_source_value,
+    de.drug_exposure_start_date,
+    de.drug_exposure_end_date,
+    de.refills,
+    de.route_concept_id,
+    c.concept_name AS drug_name,
+    c.vocabulary_id AS drug_vocabulary
+FROM drug_exposure de
+INNER JOIN IngredientDrugs id ON de.drug_concept_id = id.drug_concept_id  -- Filter to drugs with specified ingredients
+LEFT JOIN concept c ON de.drug_concept_id = c.concept_id
+WHERE de.days_supply IS NOT NULL  
+    AND de.drug_concept_id != 0   
+    AND de.dose_unit_source_value IS NOT NULL
+ORDER BY de.days_supply DESC
+LIMIT 10000;
