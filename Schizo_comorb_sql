@@ -1,0 +1,102 @@
+WITH schizophrenia_concept AS (
+    SELECT concept_id
+    FROM concept
+    WHERE concept_code IN (
+        '295.02', '295.21', '295.24', '295.55', 'F20.5', '295.01', '295.2', 
+        '295.54', '295.82', 'F20.1', '295.1', '295.12', '295.32', '295.81', 'F20.9', 
+        '295.5', '295.9', '295.91', '295.35', '295.51', '295.53', '295.85', '295.92', 
+        'F20.2', '295.34', '295', '295.52', 'F20', '295.14', '295.83', '295.13', 
+        '295.25', '295.3', '295.93', '295.94', '295.11', '295.84', '295.95', 'V11.0', 
+        '295.03', '295.23', '295.31', 'F20.3', 'F20.89', '295.04', '295.15', '295.33', 
+        '295.22', '295.8', 'F20.0', '295.05', 'F20.8'
+    )
+),
+co_morbidity_concept AS (
+    SELECT concept_id
+    FROM concept
+    WHERE domain_id = 'Condition'
+      AND (
+        (concept_code BETWEEN 'I20' AND 'I25') OR --Ischemic heart disease(angina, MI)
+        (concept_code BETWEEN 'I30' AND 'I52') OR --Other heart diseases (pericarditis, heart failure, arrhythmias, cardiomyopathy, valve disease)
+        (concept_code BETWEEN '410' AND '414') OR --Ischemic heart disease
+        (concept_code BETWEEN '420' AND '429') -- other forms of heart disease
+      )
+),
+
+schizo_patients AS (
+    SELECT DISTINCT person_id
+    FROM condition_occurrence
+    WHERE condition_concept_id IN (SELECT concept_id FROM schizophrenia_concept)
+),
+co_morb_patients AS (
+    SELECT DISTINCT person_id
+    FROM condition_occurrence
+    WHERE condition_concept_id IN (SELECT concept_id FROM co_morbidity_concept)
+),
+schizo_with_comorb AS (
+    SELECT person_id
+    FROM schizo_patients
+    WHERE person_id IN (SELECT person_id FROM co_morb_patients)
+),
+-- Randomize the sample size and order them by number
+numbered_general_sample AS (
+    SELECT person_id,
+           ROW_NUMBER() OVER (ORDER BY RANDOM()) AS rn
+    FROM schizo_patients
+    WHERE person_id NOT IN (SELECT person_id FROM schizo_with_comorb)
+),
+-- Use that number to match general sample with size of schizo
+-- with co morb
+schizo_general_sample AS (
+    SELECT person_id
+    FROM numbered_general_sample
+    WHERE rn <= (SELECT COUNT(*) FROM schizo_with_comorb)
+),
+schizo_drugs AS (
+    WITH IngredientConcepts AS (
+        SELECT concept_id
+        FROM concept
+        WHERE concept_name IN (
+            'amisulpride', 'amitriptyline', 'aripiprazole', 'aripiprazole lauroxil', 'asenapine', 
+            'asenapine maleate', 'brexpiprazole', 'bromperidol', 'bupropion', 'butaperazine', 
+            'cariprazine', 'chlorpromazine', 'chlorprothixene', 'clozapine', 'droperidol', 
+            'duloxetine', 'escitalopram', 'fluanisone', 'fluoxetine', 'fluphenazine', 
+            'haloperidol', 'iloperidone', 'loxapine', 'lumateperone', 'lurasidone', 
+            'mesoridazine', 'mirtazapine', 'molindone', 'nortriptyline', 'olanzapine', 
+            'paliperidone', 'paroxetine', 'perazine', 'periciazine', 'perphenazine', 
+            'pimavanserin', 'pimozide', 'pipamperone', 'pipothiazine', 'prochlorperazine', 
+            'promazine', 'quetiapine', 'risperidone', 'sertraline', 'sulpiride', 
+            'thioridazine', 'thiothixene', 'trifluoperazine', 'trifluperidol', 
+            'triflupromazine', 'valbenazine', 'venlafaxine', 'ziprasidone', 'zuclopenthixol'
+        )
+        AND domain_id = 'Drug'
+        AND standard_concept = 'S'
+    )
+    SELECT DISTINCT ds.drug_concept_id
+    FROM drug_strength ds
+    JOIN IngredientConcepts ic ON ds.ingredient_concept_id = ic.concept_id
+    JOIN concept dc ON ds.drug_concept_id = dc.concept_id
+    WHERE dc.domain_id = 'Drug'
+      AND dc.standard_concept = 'S'
+      AND ds.valid_start_date <= CURRENT_DATE
+      AND ds.valid_end_date >= CURRENT_DATE
+    ORDER BY ds.drug_concept_id
+)
+
+SELECT
+    de.person_id,
+    de.days_supply,
+    CASE
+        WHEN de.person_id IN (SELECT person_id FROM schizo_with_comorb) THEN 'Schizo + Comorbidity'
+        ELSE 'Schizo Only'
+    END AS group_label
+-- FROM drug_sample ds
+FROM drug_exposure de
+WHERE de.person_id IN (
+    SELECT person_id FROM schizo_with_comorb
+    UNION
+    SELECT person_id FROM schizo_general_sample
+)
+AND de.days_supply IS NOT NULL
+-- Filter from schizophrenida drugs
+AND de.drug_concept_id IN (SELECT drug_concept_id FROM schizo_drugs)
