@@ -1,4 +1,4 @@
-WITH IngredientDrugs AS (
+WITH IngredientDrugs AS ( 
     -- Identify drugs with specified ingredients
     WITH IngredientConcepts AS (
         SELECT concept_id, concept_name
