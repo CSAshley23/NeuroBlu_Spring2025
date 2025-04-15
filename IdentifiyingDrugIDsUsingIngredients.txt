@@ -1,0 +1,39 @@
+WITH IngredientConcepts AS (
+    SELECT concept_id, concept_name
+    FROM concept
+    WHERE concept_name IN (
+        'amisulpride', 'amitriptyline', 'aripiprazole', 'aripiprazole lauroxil', 'asenapine', 
+        'asenapine maleate', 'brexpiprazole', 'bromperidol', 'bupropion', 'butaperazine', 
+        'cariprazine', 'chlorpromazine', 'chlorprothixene', 'clozapine', 'droperidol', 
+        'duloxetine', 'escitalopram', 'fluanisone', 'fluoxetine', 'fluphenazine', 
+        'haloperidol', 'iloperidone', 'loxapine', 'lumateperone', 'lurasidone', 
+        'mesoridazine', 'mirtazapine', 'molindone', 'nortriptyline', 'olanzapine', 
+        'paliperidone', 'paroxetine', 'perazine', 'periciazine', 'perphenazine', 
+        'pimavanserin', 'pimozide', 'pipamperone', 'pipothiazine', 'prochlorperazine', 
+        'promazine', 'quetiapine', 'risperidone', 'sertraline', 'sulpiride', 
+        'thioridazine', 'thiothixene', 'trifluoperazine', 'trifluperidol', 
+        'triflupromazine', 'valbenazine', 'venlafaxine', 'ziprasidone', 'zuclopenthixol'
+    )
+    AND domain_id = 'Drug'  -- Ensure drug-related concepts
+    AND standard_concept = 'S'  -- Use standard concepts only
+)
+SELECT DISTINCT
+    dc.concept_id AS drug_concept_id,
+    dc.concept_name AS drug_name,  -- Ensure this matches the actual column name in `concept`
+    dc.concept_class_id AS drug_concept_class,
+    ic.concept_id AS ingredient_concept_id,
+    ic.concept_name AS ingredient_name,
+    ds.amount_value,
+    ds.amount_unit_concept_id,
+    ds.numerator_value,
+    ds.numerator_unit_concept_id,
+    ds.denominator_value,
+    ds.denominator_unit_concept_id
+FROM drug_strength ds
+JOIN IngredientConcepts ic ON ds.ingredient_concept_id = ic.concept_id
+JOIN concept dc ON ds.drug_concept_id = dc.concept_id
+WHERE dc.domain_id = 'Drug' 
+    AND dc.standard_concept = 'S'  -- Ensure drugs are standard concepts
+    AND ds.valid_end_date >= '2025-04-01'  -- Valid as of today
+    AND ds.valid_start_date <= '2025-04-01'
+--ORDER BY dc.concept_name, ic.concept_name;
