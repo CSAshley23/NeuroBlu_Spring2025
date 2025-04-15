@@ -1,0 +1,25 @@
+from scipy import stats
+import neuroblu as nb
+
+def analyze_days_supply(df):
+    # Summary stats
+    summary = df.groupby('group_label')['days_supply'].agg(
+        Mean='mean',
+        Median='median',
+        Mode=lambda x: stats.mode(x, keepdims=True)[0][0]
+    )
+    print("\n📊 Summary Statistics:")
+    print(summary)
+
+    # Hypothesis test
+    group_a = df[df['group_label'] == 'Schizo + Comorbidity']['days_supply']
+    group_b = df[df['group_label'] == 'Schizo Only']['days_supply']
+    
+    t_stat, p_val = stats.ttest_ind(group_a, group_b, equal_var=False)
+    print(f"\n📈 T-test between groups:\nT-stat: {t_stat:.2f}, P-value: {p_val:.4f}")
+
+
+if(__name__ =="__main__"):
+    df = nb.get_df('schizo_autoimmune_df')
+    df = df[df['days_supply'] > 1]
+    analyze_days_supply(df)
