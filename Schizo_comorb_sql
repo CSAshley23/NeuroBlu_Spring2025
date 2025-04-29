@@ -1,5 +1,5 @@
 WITH schizophrenia_concept AS (
-    SELECT concept_id
+    SELECT concept_id 
     FROM concept
     WHERE concept_code IN (
         '295.02', '295.21', '295.24', '295.55', 'F20.5', '295.01', '295.2', 
