@@ -2,8 +2,7 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn import preprocessing
 import numpy as np
 import neuroblu as nb
-import shap
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -36,33 +35,41 @@ def generate_onehot_encoded_dataset(data, categorical_columns, numerical_columns
 
     # all_feature_names = numerical_columns + list(encoded_cat_names)
     # actual_feature_names=[]
-    #Are truth value is the days supply
+    # Handle target variable ('truth') with clipping and transformation
     truth = data['days_supply'].values
+    print("Min:", truth.min())
+
+    #Maybe add this back in when the data is better
+    truth = np.log1p(truth)  # Apply log transformation
+    truth = preprocessing.MinMaxScaler().fit_transform(truth.reshape(-1, 1)).flatten()  # Rescale to 0-1
 
     return features, truth
 
 
 if(__name__ =="__main__"):
-    df = nb.get_df('Days_supply_without_outliers')
+    df = nb.get_df('df_comorb_flags')
     categorical_columns = ['drug_concept_id','dose_unit_source_value','route_concept_id']
-    numerical_columns = ['refills']
+    numerical_columns = [
+    'refills', 'quantity',
+    'has_cvd', 'has_diabetes', 'has_sleep_apnea', 'has_dementia',
+    'has_parkinsons', 'has_obesity', 'has_hyperlipidemia',
+    'has_arrhythmia', 'has_epilepsy', 'has_autoimmune'
+    ]
+
     features, truth = generate_onehot_encoded_dataset(df, categorical_columns, numerical_columns)
     # print("This is features", features)
     # print("This is the truth values", truth)
 
-    model = LinearRegression()
-
     x_train, x_test, y_train, y_test = train_test_split(features, truth, test_size=0.15, random_state=0)
 
-    model.fit(x_train, y_train)
-    predictions = model.predict(x_test)
-
-    mse = mean_squared_error(y_test, predictions)
-    r2 = r2_score(y_test, predictions)
+    model_ridge = Ridge(alpha=1.0)
+    model_ridge.fit(x_train, y_train)
+    predictions_ridge = model_ridge.predict(x_test)
     
-    print(f"Mean Squared Error: {mse:.2f}")
-    print(f"R² Score: {r2:.2f}")
-
+    mse_ridge = mean_squared_error(y_test, predictions_ridge)
+    r2_ridge = r2_score(y_test, predictions_ridge)
+    print(f"Ridge Regression - Mean Squared Error: {mse_ridge:.2f}")
+    print(f"Ridge Regression - R² Score: {r2_ridge:.2f}")
     
     
 

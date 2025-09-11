@@ -1,0 +1,141 @@
+WITH schizo_ingredient_concepts AS (
+    SELECT drug_concept_id
+    FROM drug_lookup
+    WHERE LOWER(drug_concept_name) IN (
+        'amisulpride', 'amitriptyline', 'aripiprazole', 'aripiprazole lauroxil',
+        'asenapine', 'asenapine maleate', 'brexpiprazole', 'bromperidol',
+        'bupropion', 'butaperazine', 'cariprazine', 'chlorpromazine',
+        'chlorprothixene', 'clozapine', 'droperidol', 'duloxetine',
+        'escitalopram', 'fluanisone', 'fluoxetine', 'fluphenazine',
+        'haloperidol', 'iloperidone', 'loxapine', 'lumateperone', 'lurasidone',
+        'mesoridazine', 'mirtazapine', 'molindone', 'nortriptyline',
+        'olanzapine', 'paliperidone', 'paroxetine', 'perazine', 'periciazine',
+        'perphenazine', 'pimavanserin', 'pimozide', 'pipamperone',
+        'pipothiazine', 'prochlorperazine', 'promazine', 'quetiapine',
+        'risperidone', 'sertraline', 'sulpiride', 'thioridazine', 'thiothixene',
+        'trifluoperazine', 'trifluperidol', 'triflupromazine', 'valbenazine',
+        'venlafaxine', 'ziprasidone', 'zuclopenthixol'
+    )
+),
+potential_schizo_drugs AS (
+    SELECT drug_concept_id
+    FROM clinical_drug_ingredient_mapping
+    WHERE ingredient_concept_id IN (SELECT drug_concept_id FROM schizo_ingredient_concepts)
+),
+IngredientDrugs AS (
+    SELECT DISTINCT dc.concept_id AS drug_concept_id
+    FROM drug_strength ds
+    JOIN potential_schizo_drugs psd ON ds.ingredient_concept_id = psd.drug_concept_id
+    JOIN concept dc ON ds.drug_concept_id = dc.concept_id
+    WHERE dc.domain_id = 'Drug'
+        AND dc.standard_concept = 'S'
+        AND ds.valid_end_date >= '2025-04-01'
+        AND ds.valid_start_date <= '2025-04-01'
+),
+
+cvd_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE (c.concept_code BETWEEN 'I20' AND 'I25') OR (c.concept_code BETWEEN 'I30' AND 'I52') OR (c.concept_code BETWEEN '410' AND '414') OR (c.concept_code BETWEEN '420' AND '429')
+),
+diabetes_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE (c.concept_code BETWEEN 'E08' AND 'E13') OR c.concept_code IN ('E16', 'E23', 'E83', 'E88', 'E89')
+),
+sleep_apnea_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code IN ('G47.3', 'G47.30', 'G47.31', 'G47.33', 'G47.34', 'G47.37')
+),
+dementia_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code IN ('F03.90', 'F03.91')
+),
+parkinsons_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code IN ('G20', 'G20.A', 'G20.A1', 'G20.A2', 'G20.B', 'G20.B1', 'G20.B2', 'G20.C')
+),
+obesity_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code IN ('E66.0', 'E66.1', 'E66.2', 'E66.3', 'E66.8', 'E66.9')
+),
+hyperlipidemia_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code IN ('E78.2', 'E78.4', 'E78.49', 'E78.5', '272.2', '272.4', 'Z13', 'Z71', 'Z83')
+),
+arrhythmia_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code BETWEEN 'I49' AND 'I49.9'
+),
+epilepsy_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code LIKE 'G40%' OR c.concept_code LIKE '345%'
+),
+autoimmune_patients AS (
+    SELECT DISTINCT co.person_id
+    FROM condition_occurrence co
+    JOIN concept c ON co.condition_concept_id = c.concept_id
+    WHERE c.concept_code BETWEEN 'D80' AND 'D89'
+),
+person_flags AS (
+    SELECT DISTINCT co.person_id,
+        CASE WHEN co.person_id IN (SELECT person_id FROM cvd_patients) THEN 1 ELSE 0 END AS has_cvd,
+        CASE WHEN co.person_id IN (SELECT person_id FROM diabetes_patients) THEN 1 ELSE 0 END AS has_diabetes,
+        CASE WHEN co.person_id IN (SELECT person_id FROM sleep_apnea_patients) THEN 1 ELSE 0 END AS has_sleep_apnea,
+        CASE WHEN co.person_id IN (SELECT person_id FROM dementia_patients) THEN 1 ELSE 0 END AS has_dementia,
+        CASE WHEN co.person_id IN (SELECT person_id FROM parkinsons_patients) THEN 1 ELSE 0 END AS has_parkinsons,
+        CASE WHEN co.person_id IN (SELECT person_id FROM obesity_patients) THEN 1 ELSE 0 END AS has_obesity,
+        CASE WHEN co.person_id IN (SELECT person_id FROM hyperlipidemia_patients) THEN 1 ELSE 0 END AS has_hyperlipidemia,
+        CASE WHEN co.person_id IN (SELECT person_id FROM arrhythmia_patients) THEN 1 ELSE 0 END AS has_arrhythmia,
+        CASE WHEN co.person_id IN (SELECT person_id FROM epilepsy_patients) THEN 1 ELSE 0 END AS has_epilepsy,
+        CASE WHEN co.person_id IN (SELECT person_id FROM autoimmune_patients) THEN 1 ELSE 0 END AS has_autoimmune
+    FROM condition_occurrence co
+)
+
+SELECT 
+    de.drug_exposure_id,
+    de.person_id,
+    de.drug_concept_id,
+    de.days_supply,
+    de.quantity,
+    de.dose_unit_source_value,
+    de.drug_exposure_start_date,
+    de.drug_exposure_end_date,
+    de.refills,
+    de.route_concept_id,
+    c.concept_name AS drug_name,
+    c.vocabulary_id AS drug_vocabulary,
+    pf.has_cvd,
+    pf.has_diabetes,
+    pf.has_sleep_apnea,
+    pf.has_dementia,
+    pf.has_parkinsons,
+    pf.has_obesity,
+    pf.has_hyperlipidemia,
+    pf.has_arrhythmia,
+    pf.has_epilepsy,
+    pf.has_autoimmune
+FROM drug_exposure de
+INNER JOIN IngredientDrugs id ON de.drug_concept_id = id.drug_concept_id
+LEFT JOIN concept c ON de.drug_concept_id = c.concept_id
+LEFT JOIN person_flags pf ON de.person_id = pf.person_id
+WHERE de.days_supply BETWEEN 7 AND 365
+    AND de.drug_concept_id != 0
+    AND de.dose_unit_source_value IS NOT NULL
+ORDER BY RANDOM()

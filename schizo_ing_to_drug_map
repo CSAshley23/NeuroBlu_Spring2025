@@ -1,0 +1,33 @@
+
+WITH schizo_ingredient_concepts as (
+    SELECT drug_concept_id
+    FROM drug_lookup
+    WHERE LOWER(drug_concept_name) IN (
+        'amisulpride', 'amitriptyline', 'aripiprazole', 'aripiprazole lauroxil',
+        'asenapine', 'asenapine maleate', 'brexpiprazole', 'bromperidol',
+        'bupropion', 'butaperazine', 'cariprazine', 'chlorpromazine',
+        'chlorprothixene', 'clozapine', 'droperidol', 'duloxetine',
+        'escitalopram', 'fluanisone', 'fluoxetine', 'fluphenazine',
+        'haloperidol', 'iloperidone', 'loxapine', 'lumateperone', 'lurasidone',
+        'mesoridazine', 'mirtazapine', 'molindone', 'nortriptyline',
+        'olanzapine', 'paliperidone', 'paroxetine', 'perazine', 'periciazine',
+        'perphenazine', 'pimavanserin', 'pimozide', 'pipamperone',
+        'pipothiazine', 'prochlorperazine', 'promazine', 'quetiapine',
+        'risperidone', 'sertraline', 'sulpiride', 'thioridazine', 'thiothixene',
+        'trifluoperazine', 'trifluperidol', 'triflupromazine', 'valbenazine',
+        'venlafaxine', 'ziprasidone', 'zuclopenthixol'
+    )
+),
+--Running this soley created around 20k rows
+potential_schizo_drugs as (
+    SELECT drug_concept_id
+    FROM clinical_drug_ingredient_mapping
+    WHERE ingredient_concept_id in (SELECT drug_concept_id from schizo_ingredient_concepts)
+)
+--This returns about 740 rows
+--Filter based on the two flags
+SELECT *
+FROM drug_lookup
+WHERE drug_concept_id IN (SELECT drug_concept_id FROM potential_schizo_drugs)
+AND behavioral_health_treatment_flag = true
+AND is_psych_drug = true
