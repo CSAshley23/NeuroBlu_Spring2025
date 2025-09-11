@@ -1,0 +1,27 @@
+
+
+    SELECT dl.drug_concept_id, dl.drug_concept_name, dl.is_psych_drug
+    FROM drug_lookup dl
+    left join 
+
+
+        
+    left join condition_occurrence co on dl.d
+    WHERE co.condition_concept_id IN (select co.condition_occurence FROM concept
+    WHERE concept_code IN ('F20.0', 'F20.1', 'F20.2', 'F20.3', 'F20.5', 
+                           'F20.81', 'F20.89', 'F20.9'))
+    LIMIT 50
+),
+schizo_patient_drugs as (
+    SELECT DISTINCT de.drug_concept_id
+    FROM drug_exposure de
+    JOIN schizo_patients p on de.person_id = p.person_id
+)
+SELECT dl.drug_concept_id, dl.drug_concept_name, dl.is_psych_drug
+FROM drug_lookup dl
+WHERE dl.drug_concept_id IN (SELECT drug_concept_id FROM schizo_patient_drugs)
+AND dl.is_psych_drug = TRUE;
+
+
+
+
